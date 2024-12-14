@@ -3,14 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 import re
-
-# Base URL for Transfermarkt
-base_url = 'https://www.transfermarkt.com'
-
-# Headers to mimic a browser request
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36'
-}
+from scrap_commons import *
 
 # Dictionary mapping league names to their Transfermarkt codes and formatted names for URLs
 leagues = {
@@ -21,40 +14,6 @@ leagues = {
     'La Liga': {'code': 'ES1', 'url_name': 'laliga'},
     'Süper Lig': {'code': 'TR1', 'url_name': 'super-lig'}
 }
-
-
-
-
-
-def get_team_links(league_name, league_code, season_year, timeout=10):
-    """
-    Function to get team links for a given league and season.
-
-    Parameters:
-    league_name (str): The name of the league formatted for the URL (e.g., 'premier-league').
-    league_code (str): The Transfermarkt code for the league (e.g., 'GB1' for Premier League).
-    season_year (str): The season year (e.g., '2023' for 2023/2024 season).
-
-    Returns:
-    list: A list of tuples containing team names and URLs.
-    """
-    # Construct the URL for the league's overview page
-    league_url = f'{base_url}/{league_name}/startseite/wettbewerb/{league_code}/saison_id/{season_year}'
-
-    # Request the league page
-    response = requests.get(league_url, headers=headers, timeout=timeout)
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Find all team links within the teams table
-    teams_table = soup.find('table', class_='items')
-    team_links = []
-    for row in teams_table.find_all('tr', {'class': ['odd', 'even']}):
-        team_tag = row.find('td', class_='hauptlink no-border-links').find('a')
-        if team_tag:
-            team_name = team_tag.text.strip()
-            team_url = base_url + team_tag['href']
-            team_links.append((team_name, team_url))
-    return team_links
 
 
 def fetch_injury_data(team_links, base_url, headers, timeout=50):
@@ -100,7 +59,9 @@ def fetch_injury_data(team_links, base_url, headers, timeout=50):
                 position = player_row.find('td', class_='posrela').find_all('td')[-1].text.strip()
                 
                 # Extract birthdate and age
-                birthdate_age = player_row.select_one('td.zentriert').text.strip()
+                birthdate = player_row.select('td.zentriert')[1].text.split('(')[0][:-1]
+                age = int(player_row.select('td.zentriert')[1].text.split('(')[1].split(')')[0])
+                # birthdate_age = player_row.select_one('td.zentriert').text.strip()
                 
                 # Extract nationality (handling multiple nationalities if present)
                 nationality_imgs = player_row.select('td.zentriert img.flaggenrahmen')
@@ -139,7 +100,8 @@ def fetch_injury_data(team_links, base_url, headers, timeout=50):
                                 'Player': player_name,
                                 'Player ID': player_id,
                                 'Position': position,
-                                'Birthdate and Age': birthdate_age,
+                                'Birthdate': birthdate,
+                                'Age': age,
                                 'Nationality': nationality,
                                 'Market Value': market_value,
                                 'Season': season,
@@ -156,7 +118,8 @@ def fetch_injury_data(team_links, base_url, headers, timeout=50):
                         'Player': player_name,
                         'Player ID': player_id,
                         'Position': position,
-                        'Birthdate and Age': birthdate_age,
+                        'Birthdate': birthdate,
+                        'Age': age,
                         'Nationality': nationality,
                         'Market Value': market_value,
                         'Season': 'N/A',
@@ -174,3 +137,29 @@ def fetch_injury_data(team_links, base_url, headers, timeout=50):
         time.sleep(2)
 
     return injury_data
+
+def main():
+    import requests
+    from bs4 import BeautifulSoup
+    import pandas as pd
+    import time
+
+    my_leagues = {'Premier League': {'code': 'GB1', 'url_name': 'premier-league'}}
+    seasons = [2024]
+
+    for season in seasons:
+        for league in my_leagues:
+            print("Reading league data: ", league)
+            league_dict = my_leagues[league]
+            team_links = get_team_links(
+                league_name=league_dict['url_name'], 
+                league_code=league_dict['code'], 
+                season_year=season, 
+                timeout=10)
+            time.sleep(2)
+            injury_data = fetch_injury_data(team_links, base_url, headers, timeout=100)
+            df_injury_data = pd.DataFrame(injury_data)
+            # df_injury_data.to_csv(f"player_injury_data_{league}_{season}.csv", index=False)
+
+if __name__ == '__main__':
+    main()
