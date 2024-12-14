@@ -1,0 +1,3 @@
+Dataset link: https://drive.google.com/drive/folders/1CT7iWtyFao8qBGCq3XczK4cLGDQWqm4w?usp=sharing
+
+GitHub Link: https://github.com/frknayk/InjuryPrediction
